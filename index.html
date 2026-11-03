@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>合約市場掃描器</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131b2e;--panel2:#182238;--text:#edf2ff;--muted:#8e9bb5;--line:#26334d;--green:#39d98a;--red:#ff647c;--yellow:#f5c451;--blue:#7aa7ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:18px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+h1{font-size:21px;margin:0}small,.muted{color:var(--muted)}.tag{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:6px 9px;color:var(--yellow)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi{font-size:22px;font-weight:700;margin-top:7px}.sub{font-size:12px;color:var(--muted);margin-top:4px}
+section{margin:18px 0}h2{font-size:16px;margin:0 0 10px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:9px 12px;border-radius:10px;cursor:pointer}
+button.active{border-color:var(--blue);background:#203151}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);font-weight:500}
+.pos{color:var(--green)}.neg{color:var(--red)}.neutral{color:var(--yellow)}
+.score{font-weight:700}.pill{border-radius:7px;padding:4px 7px;background:#203151;font-size:12px}
+.quads{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.q{min-height:105px}.q h3{font-size:14px;margin:0 0 8px}.q p{margin:4px 0;color:var(--muted);font-size:13px}
+.scatter-wrap{width:100%;overflow-x:auto}.scatter-wrap svg{display:block;width:100%;min-width:430px;height:auto}.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;color:var(--muted);font-size:12px}.legend span{display:flex;align-items:center;gap:5px}.legend i{display:inline-block;width:9px;height:9px;border-radius:50%}.footer{font-size:12px;color:var(--muted);line-height:1.6;margin-top:16px}
+.hide{display:none}
+@media(max-width:700px){main{padding:12px}.grid{grid-template-columns:repeat(2,1fr)}.kpi{font-size:20px}.card{padding:12px}.tablewrap{overflow-x:auto}.quads{gap:8px}header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div><h1>合約市場掃描器</h1><small>私人版 · USDT 永續合約分析</small></div>
+<span class="tag" id="liveStatus">連線中…</span>
+</header>
+<div class="card" style="margin-bottom:14px">
+  <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+    <div><strong>Binance USDT 永續行情</strong><div class="sub" id="dataMeta">準備取得公開市場資料</div></div>
+    <button onclick="loadMarket()">立即更新</button>
+  </div>
+</div>
+<div class="grid">
+<div class="card"><div class="muted">掃描市場</div><div class="kpi" id="marketCount">—</div><div class="sub">已掃描合約</div></div>
+<div class="card"><div class="muted">多方候選</div><div class="kpi pos" id="longCount">—</div><div class="sub">OI↑ 價格↑ 候選</div></div>
+<div class="card"><div class="muted">空方候選</div><div class="kpi neg" id="shortCount">—</div><div class="sub">OI↑ 價格↓ 候選</div></div>
+<div class="card"><div class="muted">市場狀態</div><div class="kpi neutral" id="marketState">載入中</div><div class="sub">依 BTC 1H 價格變化</div></div>
+</div>
+<section class="card">
+<h2>候選幣排行榜</h2>
+<div class="tabs"><button class="active" onclick="show('all',this)">全部</button><button onclick="show('long',this)">多方</button><button onclick="show('short',this)">空方</button></div>
+<div class="tablewrap"><table><thead><tr><th>幣種</th><th>方向</th><th>評分</th><th>OI 變化</th><th>價格 1H</th><th>相對 BTC</th><th>狀態</th></tr></thead>
+<tbody id="rows"><tr><td colspan="7" class="muted">正在載入市場資料…</td></tr></tbody></table></div>
+</section>
+<section class="card">
+<h2>OI × 價格四象限圖</h2>
+<div class="muted" style="font-size:12px;margin-bottom:10px">X 軸：價格變化（%）　Y 軸：OI 變化（%）｜點位為掃描到的合約；X=1H價格變化，Y=1H OI變化</div>
+<div class="scatter-wrap">
+<svg viewBox="0 0 600 430" role="img" aria-label="OI與價格變化四象限散點圖">
+<rect x="64" y="28" width="254" height="174" fill="#3b202c" opacity=".75"/>
+<rect x="318" y="28" width="254" height="174" fill="#153a35" opacity=".75"/>
+<rect x="64" y="202" width="254" height="174" fill="#282d3d" opacity=".8"/>
+<rect x="318" y="202" width="254" height="174" fill="#3a3020" opacity=".8"/>
+<line x1="318" y1="28" x2="318" y2="376" stroke="#a8b5cc" stroke-width="1.5"/>
+<line x1="64" y1="202" x2="572" y2="202" stroke="#a8b5cc" stroke-width="1.5"/>
+<g fill="#dce5f7" font-size="13">
+<text x="334" y="50">Q2｜偏多操作（價格↑／OI↑）</text><text x="334" y="68" fill="#9bb7ad" font-size="11">順勢找多／多單續抱觀察</text>
+<text x="80" y="50">Q1｜偏空操作（價格↓／OI↑）</text><text x="80" y="68" fill="#d9a2af" font-size="11">反抽找空／空單續抱觀察</text>
+<text x="80" y="352">Q3｜多單風險提醒（價格↓／OI↓）</text><text x="80" y="369" fill="#b0b7c7" font-size="11">考慮減倉／止盈／檢查止損</text>
+<text x="334" y="352">Q4｜空單風險提醒（價格↑／OI↓）</text><text x="334" y="369" fill="#d6bd8a" font-size="11">考慮減倉／止盈／檢查止損</text>
+<text x="318" y="414" text-anchor="middle">價格變化（%） →</text>
+<text x="17" y="202" transform="rotate(-90 17 202)" text-anchor="middle">OI 變化（%） →</text>
+<text x="64" y="394">-</text><text x="565" y="394">+</text><text x="42" y="34">+</text><text x="42" y="378">-</text>
+</g>
+<g id="livePoints" stroke="#0b1020" stroke-width="2"></g>
+</svg>
+</div>
+<div class="legend"><span><i style="background:#39d98a"></i>Q2 偏多</span><span><i style="background:#ff647c"></i>Q1 偏空</span><span><i style="background:#7aa7ff"></i>Q3 多單管理</span><span><i style="background:#f5c451"></i>Q4 空單管理</span></div>
+<div class="footer">象限依使用者指定的編號顯示：Q1 為價格↓、OI↑的偏空區；Q2 為價格↑、OI↑的偏多區。Q3/Q4 是倉位退出、提醒管理既有部位的區域。這些是操作提示，不是自動下單或必然平倉訊號；仍需搭配 CVD、4H 結構、支撐壓力與止損規則確認。</div>
+</section>
+<section class="card">
+<h2>評分構成（方向強度，不是勝率）</h2>
+<table><tbody>
+<tr><td>OI + CVD / 市場結構</td><td>30 分</td></tr>
+<tr><td>1H + 24H 價格動能</td><td>20 分</td></tr>
+<tr><td>相對 BTC 強弱</td><td>15 分</td></tr>
+<tr><td>4H 趨勢結構</td><td>15 分</td></tr>
+<tr><td>資金費率 + 多空比</td><td>10 分</td></tr>
+<tr><td>清算 + 流動性</td><td>10 分</td></tr>
+</tbody></table>
+<div class="footer">目前接入 Binance 公開市場行情；OI 歷史資料若 API 無回應會標示資料不足。CVD、清算、多空比尚未接入，不以假資料代替。交易計畫需再經 15M BOS/CHOCH、回踩與風險報酬比確認。此原型僅展示介面，不構成交易建議。</div>
+</section>
+</main>
+<script>
+let currentSide='all', marketRows=[];
+function show(side,btn){currentSide=side;document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderRows();}
+const fmt=(v,d=2)=>(Number.isFinite(v)?(v>0?'+':'')+v.toFixed(d)+'%':'—');
+const cls=v=>v>0?'pos':v<0?'neg':'neutral';
+async function fetchJson(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+async function pool(items,limit,fn){let i=0;const workers=Array.from({length:limit},async()=>{while(i<items.length){const item=items[i++];try{await fn(item)}catch(e){}}});await Promise.all(workers);}
+async function loadMarket(){
+ const status=document.getElementById('liveStatus'),meta=document.getElementById('dataMeta');
+ status.textContent='更新中…';status.style.color='var(--yellow)';
+ try{
+  const [tickers,info]=await Promise.all([
+   fetchJson('/api/binance/fapi/v1/ticker/24hr'),
+   fetchJson('/api/binance/fapi/v1/exchangeInfo')
+  ]);
+  const valid=new Set(info.symbols.filter(s=>s.contractType==='PERPETUAL'&&s.quoteAsset==='USDT'&&s.status==='TRADING').map(s=>s.symbol));
+  const symbols=tickers.filter(t=>valid.has(t.symbol)).sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,45);
+  const results=[];
+  await pool(symbols,5,async t=>{
+    const [k,oi]=await Promise.all([
+      fetchJson(`/api/binance/fapi/v1/klines?symbol=${t.symbol}&interval=1h&limit=2`),
+      fetchJson(`/api/binance/futures/data/openInterestHist?symbol=${t.symbol}&period=1h&limit=2`)
+    ]);
+    if(!Array.isArray(k)||k.length<2||!Array.isArray(oi)||oi.length<2)return;
+    const p0=Number(k[0][4]),p1=Number(k[1][4]);
+    const oi0=Number(oi[0].sumOpenInterest),oi1=Number(oi[1].sumOpenInterest);
+    const priceChange=(p1/p0-1)*100,oiChange=(oi1/oi0-1)*100;
+    if(!Number.isFinite(priceChange)||!Number.isFinite(oiChange))return;
+    results.push({symbol:t.symbol,priceChange,oiChange,price:Number(t.lastPrice),volume:Number(t.quoteVolume),funding:null});
+  });
+  marketRows=results.sort((a,b)=>b.volume-a.volume);
+  renderRows();renderPlot();
+  document.getElementById('marketCount').textContent=marketRows.length;
+  document.getElementById('longCount').textContent=marketRows.filter(x=>x.priceChange>0&&x.oiChange>0).length;
+  document.getElementById('shortCount').textContent=marketRows.filter(x=>x.priceChange<0&&x.oiChange>0).length;
+  const btc=marketRows.find(x=>x.symbol==='BTCUSDT');
+  document.getElementById('marketState').textContent=btc?(btc.priceChange>=0?'BTC 1H 偏強':'BTC 1H 偏弱'):'資料不足';
+  const now=new Date().toLocaleString('zh-TW',{hour12:false});
+  meta.textContent=`資料來源：Binance Futures 公開 API｜更新：${now}｜OI/價格變化約以最近 1H 資料計算`;
+  status.textContent='即時資料已更新';status.style.color='var(--green)';
+ }catch(e){
+  status.textContent='連線失敗';status.style.color='var(--red)';
+  meta.textContent='無法取得 Binance API。請確認網路，或改由支援 API 的網頁環境開啟。';
+ }
+}
+function renderRows(){
+ const rows=document.getElementById('rows');
+ let data=marketRows.filter(x=>currentSide==='all'||(currentSide==='long'?x.priceChange>0&&x.oiChange>0:x.priceChange<0&&x.oiChange>0));
+ data.sort((a,b)=>Math.abs(b.priceChange)+Math.abs(b.oiChange)-Math.abs(a.priceChange)-Math.abs(a.oiChange));
+ data=data.slice(0,20);
+ if(!data.length){rows.innerHTML='<tr><td colspan="7" class="muted">目前沒有符合條件的資料，或 API 未回傳 OI 歷史值。</td></tr>';return;}
+ rows.innerHTML=data.map(x=>{
+  const side=x.priceChange>0&&x.oiChange>0?'long':x.priceChange<0&&x.oiChange>0?'short':'other';
+  const label=side==='long'?'偏多候選':side==='short'?'偏空候選':x.oiChange<0?'倉位減少':'觀察';
+  const score=Math.round(Math.min(100,(Math.abs(x.priceChange)*15+Math.abs(x.oiChange)*8)));
+  const signed=side==='long'?score:side==='short'?-score:0;
+  const relative=x.symbol==='BTCUSDT'?0:x.priceChange-(marketRows.find(z=>z.symbol==='BTCUSDT')?.priceChange||0);
+  return `<tr data-side="${side}"><td>${x.symbol}</td><td class="${side==='long'?'pos':side==='short'?'neg':'neutral'}">${label}</td><td class="score ${cls(signed)}">${signed>0?'+':''}${signed}</td><td class="${cls(x.oiChange)}">${fmt(x.oiChange)}</td><td class="${cls(x.priceChange)}">${fmt(x.priceChange)}</td><td class="${cls(relative)}">${fmt(relative)}</td><td><span class="pill">${quadrant(x)}｜觀察</span></td></tr>`;
+ }).join('');
+}
+function quadrant(x){if(x.oiChange>0&&x.priceChange>0)return'Q2 偏多';if(x.oiChange>0&&x.priceChange<0)return'Q1 偏空';if(x.oiChange<0&&x.priceChange<0)return'Q3 多單管理';if(x.oiChange<0&&x.priceChange>0)return'Q4 空單管理';return'中性';}
+function renderPlot(){
+ const group=document.getElementById('livePoints');if(!group)return;
+ const pts=marketRows.slice().sort((a,b)=>b.volume-a.volume).slice(0,45);
+ const maxX=Math.max(1,...pts.map(x=>Math.abs(x.priceChange))),maxY=Math.max(1,...pts.map(x=>Math.abs(x.oiChange)));
+ const x0=318,y0=202,left=64,right=572,top=28,bottom=376;
+ group.innerHTML=pts.map((x,i)=>{
+  const cx=x0+(x.priceChange/maxX)*230,cy=y0-(x.oiChange/maxY)*155;
+  const color=x.oiChange>0&&x.priceChange>0?'#39d98a':x.oiChange>0&&x.priceChange<0?'#ff647c':x.oiChange<0&&x.priceChange<0?'#7aa7ff':'#f5c451';
+  const r=4+Math.min(8,Math.sqrt(x.volume/Math.max(1,...pts.map(z=>z.volume)))*8);
+  const name=x.symbol.replace('USDT','');
+  return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="${color}"><title>${name}｜價格 ${fmt(x.priceChange)}｜OI ${fmt(x.oiChange)}</title></circle><text x="${(cx+r+3).toFixed(1)}" y="${(cy+4).toFixed(1)}" fill="#f2f5ff" font-size="10">${name}</text>`;
+ }).join('');
+}
+loadMarket();
+</script>
+</body></html>

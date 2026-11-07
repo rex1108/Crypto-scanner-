@@ -95,7 +95,17 @@ let currentSide='all', marketRows=[];
 function show(side,btn){currentSide=side;document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderRows();}
 const fmt=(v,d=2)=>(Number.isFinite(v)?(v>0?'+':'')+v.toFixed(d)+'%':'—');
 const cls=v=>v>0?'pos':v<0?'neg':'neutral';
-async function fetchJson(url){const r=await fetch(url);if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+async function fetchJson(url) {
+  const endpoint = url.replace(/^\/api\/binance\//, "");
+
+  const r = await fetch(
+    `/api/binance?endpoint=${encodeURIComponent(endpoint)}`
+  );
+
+  if (!r.ok) throw new Error("HTTP " + r.status);
+
+  return r.json();
+}
 async function pool(items,limit,fn){let i=0;const workers=Array.from({length:limit},async()=>{while(i<items.length){const item=items[i++];try{await fn(item)}catch(e){}}});await Promise.all(workers);}
 async function loadMarket(){
  const status=document.getElementById('liveStatus'),meta=document.getElementById('dataMeta');

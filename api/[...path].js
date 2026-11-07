@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   try {
-    const path = req.query.path;
+    const path = req.url.split("?")[0].replace(/^\/api\//, "").split("/");
 
     if (!path) {
       return res.status(400).json({ error: "Missing API path" });
